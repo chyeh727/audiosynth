@@ -1,5 +1,7 @@
-var Synth, AudioSynth, AudioSynthInstrument;
-!function(){
+;(function(){
+
+    // TODO: 
+    // Enhancements - volumes are separately adjustable.
 
 	var URL = window.URL || window.webkitURL;
 	var Blob = window.Blob;
@@ -9,56 +11,129 @@ var Synth, AudioSynth, AudioSynthInstrument;
 	}
 
 	var _encapsulated = false;
-	var AudioSynthInstance = null;
-	var pack = function(c,arg){ return [new Uint8Array([arg, arg >> 8]), new Uint8Array([arg, arg >> 8, arg >> 16, arg >> 24])][c]; };
-	var setPrivateVar = function(n,v,w,e){Object.defineProperty(this,n,{value:v,writable:!!w,enumerable:!!e});};
-	var setPublicVar = function(n,v,w){setPrivateVar.call(this,n,v,w,true);};
-	AudioSynthInstrument = function AudioSynthInstrument(){this.__init__.apply(this,arguments);};
+
+    /* Utility function. c: 0 for 2-byte data; 1 for 4-byte-data. arg: the data itself. */
+	var pack = function(c, arg) {
+        if (c === 0) {
+            return new Uint8Array([arg, arg >> 8]);
+        } else if (c === 1) {
+            return new Uint8Array([arg, arg >> 8, arg >> 16, arg >> 24]);
+        }
+		throw new Error('Unsupported packing scheme.');
+    };
+
+	var setPrivateVar = function(n, v, w, e) {
+        Object.defineProperty(this, n, {value: v, writable: !!w, enumerable: !!e});
+    };
+
+	var setPublicVar = function(n, v, w) {
+        setPrivateVar.call(this, n, v, w, true);
+    };
+
+    /* Constructor */
+	var AudioSynthInstrument = function () {
+        this.__init__.apply(this, arguments);
+    };
+
 	var setPriv = setPrivateVar.bind(AudioSynthInstrument.prototype);
 	var setPub = setPublicVar.bind(AudioSynthInstrument.prototype);
-	setPriv('__init__', function(a,b,c) {
-		if(!_encapsulated) { throw new Error('AudioSynthInstrument can only be instantiated from the createInstrument method of the AudioSynth object.'); }
+
+    // AudioSynthInstrument method
+	setPriv('__init__', function(a, b, c) {
+		if (!_encapsulated) { 
+            throw new Error('AudioSynthInstrument can only be instantiated from the createInstrument method of the AudioSynth object.'); 
+        }
 		setPrivateVar.call(this, '_parent', a);
 		setPublicVar.call(this, 'name', b);
 		setPrivateVar.call(this, '_soundID', c);
 	});
+
+    // AudioSynthInstrument method
 	setPub('play', function(note, octave, duration) {
-		return this._parent.play(this._soundID, note, octave, duration);
+		return this._parent.play(this._soundID, note, octave, duration, this._volume);
 	});
+
+    // AudioSynthInstrument method
 	setPub('generate', function(note, octave, duration) {
-		return this._parent.generate(this._soundID, note, octave, duration);
+		return this._parent.generate(this._soundID, note, octave, duration, this._volume);
 	});
-	AudioSynth = function AudioSynth(){if(AudioSynthInstance instanceof AudioSynth){return AudioSynthInstance;}else{ this.__init__(); return this; }};
+
+	setPriv('_volume', 32768, true);
+
+    // AudioSynthInstrument method
+	setPub('setVolume', function(v) {
+		v = parseFloat(v); 
+        if ( isNaN(v) ) { v = 0; }
+		v = Math.round(v * 32768);
+		this._volume = Math.max(Math.min(v|0, 32768), 0);
+		this._parent._clearCache();
+		return this._volume;
+	});
+
+    // AudioSynthInstrument method
+	setPub('getVolume', function() { 
+        return Math.round(this._volume / 32768 * 10000) / 10000; 
+    });
+
+    /* Constructor */
+	var AudioSynth = function () {
+        this.__init__(); 
+    };
+
 	setPriv = setPrivateVar.bind(AudioSynth.prototype);
 	setPub = setPublicVar.bind(AudioSynth.prototype);
-	setPriv('_debug',false,true);
-	setPriv('_bitsPerSample',16);
-	setPriv('_channels',1);
-	setPriv('_sampleRate',44100,true);
+
+	setPriv('_debug', false, true);
+	setPriv('_bitsPerSample', 16);
+	setPriv('_channels', 1);
+	setPriv('_sampleRate', 44100, true);
+
 	setPub('setSampleRate', function(v) {
-		this._sampleRate = Math.max(Math.min(v|0,44100), 4000);
+		this._sampleRate = Math.max(Math.min(v|0, 44100), 4000);
 		this._clearCache();
 		return this._sampleRate;
 	});
-	setPub('getSampleRate', function() { return this._sampleRate; });
-	setPriv('_volume',32768,true);
-	setPub('setVolume', function(v) {
-		v = parseFloat(v); if(isNaN(v)) { v = 0; }
-		v = Math.round(v*32768);
-		this._volume = Math.max(Math.min(v|0,32768), 0);
-		this._clearCache();
-		return this._volume;
-	});
-	setPub('getVolume', function() { return Math.round(this._volume/32768*10000)/10000; });
-	setPriv('_notes',{'C':261.63,'C#':277.18,'D':293.66,'D#':311.13,'E':329.63,'F':346.23,'F#':369.99,'G':392.00,'G#':415.30,'A':440.00,'A#':466.16,'B':493.88});
-	setPriv('_fileCache',[],true);
-	setPriv('_temp',{},true);
-	setPriv('_sounds',[],true);
-	setPriv('_mod',[function(i,s,f,x){return Math.sin((2 * Math.PI)*(i/s)*f+x);}]);
-	setPriv('_resizeCache', function() {
+
+	setPub('getSampleRate', function() { 
+        return this._sampleRate; 
+    });
+
+	setPriv('_notes', {
+        'C-': 246.94,
+        'C': 261.63,
+        'C#': 277.18,
+        'D-': 277.18,
+        'D': 293.66,
+        'D#': 311.13,
+        'E-': 311.13,
+        'E': 329.63,
+        'E#': 346.23,
+        'F-': 329.63,
+        'F': 346.23,
+        'F#': 369.99,
+        'G-': 369.99,
+        'G': 392.00,
+        'G#': 415.30,
+        'A-': 415.30,
+        'A': 440.00,
+        'A#': 466.16,
+        'B-': 466.16,
+        'B': 493.88,
+        'B#': 523.25
+    });
+
+	setPriv('_fileCache', [], true);
+	setPriv('_temp', {}, true);
+	setPriv('_sounds', [], true);
+	setPriv('_mod', [
+            function(i, s, f, x) {
+                return Math.sin((2 * Math.PI) * (i / s) * f + x);
+            }
+    ]);
+	setPriv('_reconstructCache', function() {
 		var f = this._fileCache;
 		var l = this._sounds.length;
-		while(f.length<l) {
+		while(f.length < l) {
 			var octaveList = [];
 			for(var i = 0; i < 8; i++) {
 				var noteList = {};
@@ -70,15 +145,17 @@ var Synth, AudioSynth, AudioSynthInstrument;
 			f.push(octaveList);
 		}
 	});
+
 	setPriv('_clearCache', function() {
 		this._fileCache = [];
-		this._resizeCache();
+		this._reconstructCache();
 	});
-	setPub('generate', function(sound, note, octave, duration) {
+
+	setPub('generate', function(sound, note, octave, duration, volume) {
 		var thisSound = this._sounds[sound];
 		if(!thisSound) {
-			for(var i=0;i<this._sounds.length;i++) {
-				if(this._sounds[i].name==sound) {
+			for(var i=0, len = this._sounds.length; i < len; i++) {
+				if(this._sounds[i].name == sound) {
 					thisSound = this._sounds[i];
 					sound = i;
 					break;
@@ -90,15 +167,20 @@ var Synth, AudioSynth, AudioSynthInstrument;
 		this._temp = {};
 		octave |= 0;
 		octave = Math.min(8, Math.max(1, octave));
-		var time = !duration?2:parseFloat(duration);
-		if(typeof(this._notes[note])=='undefined') { throw new Error(note + ' is not a valid note.'); }
-		if(typeof(this._fileCache[sound][octave-1][note][time])!='undefined') {
-			if(this._debug) { console.log((new Date).valueOf() - t, 'ms to retrieve (cached)'); }
-			return this._fileCache[sound][octave-1][note][time];
+		var time = !duration ? 2 : parseFloat(duration);
+		if(typeof(this._notes[note]) == 'undefined') { 
+            throw new Error(note + ' is not a valid note.'); 
+        }
+		if(typeof(this._fileCache[sound][octave - 1][note][time]) != 'undefined') {
+			if(this._debug) { 
+                console.log((new Date).valueOf() - t, 'ms to retrieve (cached)'); 
+            }
+			return this._fileCache[sound][octave - 1][note][time];
 		} else {
-			var frequency = this._notes[note] * Math.pow(2,octave-4);
+            // Cache miss. Let's get to work.
+			var frequency = this._notes[note] * Math.pow(2, octave-4);
 			var sampleRate = this._sampleRate;
-			var volume = this._volume;
+			var volume = volume || 32768;
 			var channels = this._channels;
 			var bitsPerSample = this._bitsPerSample;
 			var attack = thisSound.attack(sampleRate, frequency, volume);
@@ -106,24 +188,29 @@ var Synth, AudioSynth, AudioSynthInstrument;
 			var waveFunc = thisSound.wave;
 			var waveBind = {modulate: this._mod, vars: this._temp};
 			var val = 0;
-			var curVol = 0;
 
 			var data = new Uint8Array(new ArrayBuffer(Math.ceil(sampleRate * time * 2)));
-			var attackLen = (sampleRate * attack) | 0;
-			var decayLen = (sampleRate * time) | 0;
+			var attackLen = (sampleRate * attack) || 1;
+			var decayLen = (sampleRate * time) || 1;
 
 			for (var i = 0 | 0; i !== attackLen; i++) {
 		
-				val = volume * (i/(sampleRate*attack)) * waveFunc.call(waveBind, i, sampleRate, frequency, volume);
+				val = volume * 
+                    // Modulate the amplitude.
+                    (i / attackLen) * 
+                    waveFunc.call(waveBind, i, sampleRate, frequency, volume);
 
 				data[i << 1] = val;
 				data[(i << 1) + 1] = val >> 8;
 
 			}
 
-			for (; i !== decayLen; i++) {
+			for (;i !== decayLen; i++) {
 
-				val = volume * Math.pow((1-((i-(sampleRate*attack))/(sampleRate*(time-attack)))),dampen) * waveFunc.call(waveBind, i, sampleRate, frequency, volume);
+				val = volume * 
+                    // Modulate the amplitude.
+                    Math.pow((1 - ((i - (sampleRate * attack)) / (sampleRate * (time - attack)))), dampen) * 
+                    waveFunc.call(waveBind, i, sampleRate, frequency, volume);
 
 				data[i << 1] = val;
 				data[(i << 1) + 1] = val >> 8;
@@ -150,24 +237,31 @@ var Synth, AudioSynth, AudioSynthInstrument;
 			];
 			var blob = new Blob(out, {type: 'audio/wav'});
 			var dataURI = URL.createObjectURL(blob);
-			this._fileCache[sound][octave-1][note][time] = dataURI;
-			if(this._debug) { console.log((new Date).valueOf() - t, 'ms to generate'); }
+			this._fileCache[sound][octave - 1][note][time] = dataURI;
+			if(this._debug) { 
+                console.log((new Date).valueOf() - t, 'ms to generate');
+            }
 			return dataURI;
 		}
 	});
-	setPub('play', function(sound, note, octave, duration) {
-		var src = this.generate(sound, note, octave, duration);
+
+	setPub('play', function(sound, note, octave, duration, volume) {
+		var src = this.generate(sound, note, octave, duration, volume);
 		var audio = new Audio(src);
 		audio.play();
 		return true;
 	});
-	setPub('debug', function() { this._debug = true; });
+
+	setPub('debug', function() { 
+        this._debug = true; 
+    });
+
 	setPub('createInstrument', function(sound) {
 		var n = 0;
 		var found = false;
-		if(typeof(sound)=='string') {
-			for(var i=0;i<this._sounds.length;i++) {
-				if(this._sounds[i].name==sound) {
+		if(typeof(sound) == 'string') {
+			for(var i = 0, len = this._sounds.length; i < len; i++) {
+				if(this._sounds[i].name == sound) {
 					found = true;
 					n = i;
 					break;
@@ -180,42 +274,50 @@ var Synth, AudioSynth, AudioSynthInstrument;
 				found = true;
 			}
 		}
-		if(!found) { throw new Error('Invalid sound or sound ID: ' + sound); }
+		if(!found) { 
+            throw new Error('Invalid sound or sound ID: ' + sound); 
+        }
 		_encapsulated = true;
 		var ins = new AudioSynthInstrument(this, sound, n);
 		_encapsulated = false;
 		return ins;
 	});
+
 	setPub('listSounds', function() {
 		var r = [];
-		for(var i=0;i<this._sounds.length;i++) {
+		for(var i = 0; i < this._sounds.length; i++) {
 			r.push(this._sounds[i].name);
 		}
 		return r;
 	});
+
 	setPriv('__init__', function(){
-		this._resizeCache();
+		this._reconstructCache();
 	});
+
 	setPub('loadSoundProfile', function() {
-		for(var i=0,len=arguments.length;i<len;i++) {
+		for(var i = 0, len = arguments.length; i < len; i++) {
 			o = arguments[i];
 			if(!(o instanceof Object)) { throw new Error('Invalid sound profile.'); }
 			this._sounds.push(o);
 		}
-		this._resizeCache();
+		this._reconstructCache();
 		return true;
 	});
+
 	setPub('loadModulationFunction', function() {
-		for(var i=0,len=arguments.length;i<len;i++) {
+		for(var i = 0, len = arguments.length; i < len; i++) {
 			f = arguments[i];
-			if(typeof(f)!='function') { throw new Error('Invalid modulation function.'); }
+			if(typeof(f) != 'function') { 
+                throw new Error('Invalid modulation function.'); 
+            }
 			this._mod.push(f);
 		}
 		return true;
 	});
-	AudioSynthInstance = new AudioSynth();
-	Synth = AudioSynthInstance;
-}();
+
+	window.Synth = new AudioSynth();
+})();
 
 Synth.loadModulationFunction(
 	function(i, sampleRate, frequency, x) { return 1 * Math.sin(2 * Math.PI * ((i / sampleRate) * frequency) + x); },
@@ -234,7 +336,7 @@ Synth.loadSoundProfile({
 	name: 'piano',
 	attack: function() { return 0.002; },
 	dampen: function(sampleRate, frequency, volume) {
-		return Math.pow(0.5*Math.log((frequency*volume)/sampleRate),2);
+		return Math.pow(0.5 * Math.log((frequency * volume) / sampleRate), 2);
 	},
 	wave: function(i, sampleRate, frequency, volume) {
 		var base = this.modulate[0];
@@ -251,7 +353,7 @@ Synth.loadSoundProfile({
 {
 	name: 'organ',
 	attack: function() { return 0.3 },
-	dampen: function(sampleRate, frequency) { return 1+(frequency * 0.01); },
+	dampen: function(sampleRate, frequency) { return 1 + (frequency * 0.01); },
 	wave: function(i, sampleRate, frequency) {
 		var base = this.modulate[0];
 		return this.modulate[1](
@@ -272,8 +374,8 @@ Synth.loadSoundProfile({
 
 		var vars = this.vars;
 		vars.valueTable = !vars.valueTable?[]:vars.valueTable;
-		if(typeof(vars.playVal)=='undefined') { vars.playVal = 0; }
-		if(typeof(vars.periodCount)=='undefined') { vars.periodCount = 0; }
+		if(typeof(vars.playVal) == 'undefined') { vars.playVal = 0; }
+		if(typeof(vars.periodCount) == 'undefined') { vars.periodCount = 0; }
 	
 		var valueTable = vars.valueTable;
 		var playVal = vars.playVal;
