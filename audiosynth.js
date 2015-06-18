@@ -1,7 +1,8 @@
 ;(function(){
 
     // TODO: 
-    // Enhancements - volumes are separately adjustable.
+    // Sawtooth: y = A((2t / T - 1) % 2 - 1)
+    //
 
 	var URL = window.URL || window.webkitURL;
 	var Blob = window.Blob;
@@ -361,8 +362,8 @@ Synth.loadSoundProfile({
 			sampleRate,
 			frequency,
 			base(i, sampleRate, frequency, 0) +
-				0.5*base(i, sampleRate, frequency, 0.25) +
-				0.25*base(i, sampleRate, frequency, 0.5)
+				0.5 * base(i, sampleRate, frequency, 0.25) +
+				0.25 * base(i, sampleRate, frequency, 0.5)
 		);
 	}
 },
@@ -373,7 +374,7 @@ Synth.loadSoundProfile({
 	wave: function(i, sampleRate, frequency) {
 
 		var vars = this.vars;
-		vars.valueTable = !vars.valueTable?[]:vars.valueTable;
+		vars.valueTable = !vars.valueTable ? [] : vars.valueTable;
 		if(typeof(vars.playVal) == 'undefined') { vars.playVal = 0; }
 		if(typeof(vars.periodCount) == 'undefined') { vars.periodCount = 0; }
 	
@@ -381,27 +382,27 @@ Synth.loadSoundProfile({
 		var playVal = vars.playVal;
 		var periodCount = vars.periodCount;
 
-		var period = sampleRate/frequency;
-		var p_hundredth = Math.floor((period-Math.floor(period))*100);
+		var period = sampleRate / frequency;
+		var p_hundredth = Math.floor((period - Math.floor(period)) * 100);
 
 		var resetPlay = false;
 
-		if(valueTable.length<=Math.ceil(period)) {
+		if(valueTable.length <= Math.ceil(period)) {
 	
-			valueTable.push(Math.round(Math.random())*2-1);
+			valueTable.push(Math.round(Math.random()) * 2 - 1);
 	
 			return valueTable[valueTable.length-1];
 	
 		} else {
 	
-			valueTable[playVal] = (valueTable[playVal>=(valueTable.length-1)?0:playVal+1] + valueTable[playVal]) * 0.5;
+			valueTable[playVal] = (valueTable[playVal >= (valueTable.length - 1) ? 0 : playVal + 1] + valueTable[playVal]) * 0.5;
 	
-			if(playVal>=Math.floor(period)) {
-				if(playVal<Math.ceil(period)) {
-					if((periodCount%100)>=p_hundredth) {
+			if(playVal >= Math.floor(period)) {
+				if(playVal < Math.ceil(period)) {
+					if((periodCount%100) >= p_hundredth) {
 						// Reset
 						resetPlay = true;
-						valueTable[playVal+1] = (valueTable[0] + valueTable[playVal+1]) * 0.5;
+						valueTable[playVal + 1] = (valueTable[0] + valueTable[playVal + 1]) * 0.5;
 						vars.periodCount++;	
 					}
 				} else {
